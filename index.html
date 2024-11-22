@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>セキュアファイル管理ツール</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .drop-zone {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+
+            .drop-zone:hover, .drop-zone.dragover {
+                border-color: #4299e1;
+                background-color: #ebf8ff;
+            }
+
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+
+        .notification {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .file-info {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 通知エリア -->
+    <div id="notificationArea" class="fixed top-4 right-4 z-50"></div>
+
+    <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-3xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">セキュアファイル管理ツール</h1>
+                <p class="text-gray-600">ファイルの暗号化・復号化を安全に行います</p>
+            </div>
+
+            <!-- 暗号化セクション -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">暗号化</h2>
+                <div class="drop-zone p-8 rounded-lg text-center mb-4" id="encryptDropZone">
+                    <div class="space-y-2">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4-4m4-4h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="text-sm text-gray-600">
+                            ファイルをドラッグ＆ドロップ、または
+                            <input type="file" id="encryptFile" class="hidden">
+                            <label for="encryptFile" class="text-blue-500 hover:text-blue-600 cursor-pointer">ファイルを選択</label>
+                        </div>
+                    </div>
+                </div>
+                <!-- ファイル情報表示エリア -->
+                <div id="encryptFileInfo" class="hidden mb-4 p-4 bg-gray-50 rounded-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-medium text-gray-900" id="encryptFileName"></h3>
+                            <p class="text-sm text-gray-500" id="encryptFileSize"></p>
+                        </div>
+                        <button onclick="clearEncryptFile()" class="text-gray-400 hover:text-gray-500">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+                    <input type="password" id="encryptPassword" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="暗号化用パスワード">
+                </div>
+                <button onclick="encryptFile()" class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    暗号化を実行
+                </button>
+                <div id="encryptProgress" class="hidden mt-4">
+                    <div class="bg-gray-200 rounded-full h-2">
+                        <div class="progress-bar bg-blue-500 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div id="encryptResult" class="mt-4 text-sm"></div>
+            </div>
+
+            <!-- 復号化セクション -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">復号化</h2>
+                <div class="drop-zone p-8 rounded-lg text-center mb-4" id="decryptDropZone">
+                    <div class="space-y-2">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M8 12h32M8 12a4 4 0 00-4 4v20a4 4 0 004 4h32a4 4 0 004-4V16a4 4 0 00-4-4M8 12v24m32-24v24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="text-sm text-gray-600">
+                            .lfsファイルをドラッグ＆ドロップ、または
+                            <input type="file" id="decryptFile" accept=".lfs" class="hidden">
+                            <label for="decryptFile" class="text-blue-500 hover:text-blue-600 cursor-pointer">ファイルを選択</label>
+                        </div>
+                    </div>
+                </div>
+                <!-- 復号化ファイル情報表示エリア -->
+                <div id="decryptFileInfo" class="hidden mb-4 p-4 bg-gray-50 rounded-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-medium text-gray-900" id="decryptFileName"></h3>
+                            <p class="text-sm text-gray-500" id="decryptFileSize"></p>
+                        </div>
+                        <button onclick="clearDecryptFile()" class="text-gray-400 hover:text-gray-500">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+                    <input type="password" id="decryptPassword" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="復号化用パスワード">
+                </div>
+                <button onclick="decryptFile()" class="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors">
+                    復号化を実行
+                </button>
+                <div id="decryptProgress" class="hidden mt-4">
+                    <div class="bg-gray-200 rounded-full h-2">
+                        <div class="progress-bar bg-green-500 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div id="decryptResult" class="mt-4 text-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        // 通知を表示する関数
+        function showNotification(message, type = 'success') {
+            const notificationArea = document.getElementById('notificationArea');
+            const notification = document.createElement('div');
+            notification.className = `notification mb-2 p-4 rounded-md shadow-lg ${type === 'success' ? 'bg-green-500' : 'bg-red-500'
+                } text-white`;
+            notification.innerHTML = message;
+            notificationArea.appendChild(notification);
+
+            // 3秒後に通知を消す
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    notificationArea.removeChild(notification);
+                }, 500);
+            }, 3000);
+        }
+
+        // ファイルサイズをフォーマットする関数
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // ファイル情報を表示する関数
+        function showFileInfo(file, type) {
+            const infoDiv = document.getElementById(`${type}FileInfo`);
+            const nameElement = document.getElementById(`${type}FileName`);
+            const sizeElement = document.getElementById(`${type}FileSize`);
+
+            nameElement.textContent = file.name;
+            sizeElement.textContent = formatFileSize(file.size);
+            infoDiv.classList.remove('hidden');
+
+            showNotification(`ファイル "${file.name}" のアップロードが完了しました`, 'success');
+        }
+
+        // ファイル選択をクリアする関数
+        function clearEncryptFile() {
+            document.getElementById('encryptFile').value = '';
+            document.getElementById('encryptFileInfo').classList.add('hidden');
+            document.getElementById('encryptDropZone').querySelector('.text-gray-600').textContent =
+                'ファイルをドラッグ＆ドロップ、またはファイルを選択';
+        }
+
+        function clearDecryptFile() {
+            document.getElementById('decryptFile').value = '';
+            document.getElementById('decryptFileInfo').classList.add('hidden');
+            document.getElementById('decryptDropZone').querySelector('.text-gray-600').textContent =
+                '.lfsファイルをドラッグ＆ドロップ、またはファイルを選択';
+        }
+
+        // ドラッグ&ドロップ関連のイベントリスナー設定
+        ['encryptDropZone', 'decryptDropZone'].forEach(id => {
+            const zone = document.getElementById(id);
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+            zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                const fileInput = document.getElementById(id === 'encryptDropZone' ? 'encryptFile' : 'decryptFile');
+                fileInput.files = e.dataTransfer.files;
+                showFileInfo(e.dataTransfer.files[0], id === 'encryptDropZone' ? 'encrypt' : 'decrypt');
+            });
+        });
+
+        // ファイル選択時のイベントリスナー
+        document.getElementById('encryptFile').addEventListener('change', function (e) {
+            if (e.target.files.length > 0) {
+                showFileInfo(e.target.files[0], 'encrypt');
+            }
+        });
+
+        document.getElementById('decryptFile').addEventListener('change', function (e) {
+            if (e.target.files.length > 0) {
+                showFileInfo(e.target.files[0], 'decrypt');
+            }
+        });
+
+        // 以下は前回のコードと同じ暗号化/復号化関連の関数を含めます...
+        // メタデータを含む暗号化関数
+        async function encryptFile() {
+            const fileInput = document.getElementById('encryptFile');
+            const password = document.getElementById('encryptPassword').value;
+            const resultDiv = document.getElementById('encryptResult');
+            const progressBar = document.getElementById('encryptProgress');
+            const progressIndicator = progressBar.querySelector('.progress-bar');
+
+            if (!fileInput.files.length || !password) {
+                showNotification('ファイルとパスワードを選択してください。', 'error');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            progressBar.classList.remove('hidden');
+            progressIndicator.style.width = '0%';
+
+            // ZIPファイルの処理
+            if (file.name.endsWith('.zip')) {
+                try {
+                    const zip = new JSZip();
+                    const zipData = await file.arrayBuffer();
+                    const unzipped = await zip.loadAsync(zipData);
+                    const encryptedZip = new JSZip();
+                    let processedFiles = 0;
+                    const totalFiles = Object.keys(unzipped.files).length;
+
+                    for (const [filename, fileData] of Object.entries(unzipped.files)) {
+                        const content = await fileData.async('arraybuffer');
+                        const wordArray = CryptoJS.lib.WordArray.create(content);
+                        const encrypted = CryptoJS.AES.encrypt(wordArray, password).toString();
+                        encryptedZip.file(filename, encrypted);
+                        processedFiles++;
+                        progressIndicator.style.width = `${(processedFiles / totalFiles) * 100}%`;
+                    }
+
+                    const encryptedContent = await encryptedZip.generateAsync({ type: 'blob' });
+                    downloadEncryptedFile(encryptedContent, file.name + '.lfs', resultDiv);
+                    showNotification('ZIPファイルの暗号化が完了しました。', 'success');
+                } catch (error) {
+                    showNotification('ZIPファイルの処理中にエラーが発生しました。', 'error');
+                }
+            } else {
+                reader.onload = async function (e) {
+                    try {
+                        progressIndicator.style.width = '50%';
+                        const content = e.target.result;
+                        const wordArray = CryptoJS.lib.WordArray.create(content);
+
+                        // メタデータを追加
+                        const metadata = {
+                            originalName: file.name,
+                            originalType: file.type,
+                            size: file.size,
+                            lastModified: file.lastModified
+                        };
+
+                        const combined = JSON.stringify({
+                            metadata: metadata,
+                            content: CryptoJS.AES.encrypt(wordArray, password).toString()
+                        });
+
+                        const blob = new Blob([combined], { type: 'application/octet-stream' });
+                        progressIndicator.style.width = '100%';
+                        downloadEncryptedFile(blob, file.name + '.lfs', resultDiv);
+                        showNotification('ファイルの暗号化が完了しました。', 'success');
+                    } catch (error) {
+                        showNotification('暗号化中にエラーが発生しました。', 'error');
+                    }
+                };
+
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        // メタデータを考慮した復号化関数
+        async function decryptFile() {
+            const fileInput = document.getElementById('decryptFile');
+            const password = document.getElementById('decryptPassword').value;
+            const resultDiv = document.getElementById('decryptResult');
+            const progressBar = document.getElementById('decryptProgress');
+            const progressIndicator = progressBar.querySelector('.progress-bar');
+
+            if (!fileInput.files.length || !password) {
+                showNotification('ファイルとパスワードを選択してください。', 'error');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            progressBar.classList.remove('hidden');
+            progressIndicator.style.width = '0%';
+
+            reader.onload = async function (e) {
+                try {
+                    progressIndicator.style.width = '50%';
+                    const fileContent = e.target.result;
+
+                    // JSONとして解析を試みる（新形式）
+                    try {
+                        const parsedData = JSON.parse(fileContent);
+                        const decrypted = CryptoJS.AES.decrypt(parsedData.content, password);
+                        const typedArray = convertWordArrayToUint8Array(decrypted);
+                        const blob = new Blob([typedArray], { type: parsedData.metadata.originalType || 'application/octet-stream' });
+                        progressIndicator.style.width = '100%';
+                        downloadDecryptedFile(blob, parsedData.metadata.originalName, resultDiv);
+                        showNotification('ファイルの復号化が完了しました。', 'success');
+                    }
+                    // 古い形式または暗号化されたZIPの場合
+                    catch (jsonError) {
+                        try {
+                            const decrypted = CryptoJS.AES.decrypt(fileContent, password);
+                            const typedArray = convertWordArrayToUint8Array(decrypted);
+
+                            // ZIPファイルかどうかを確認
+                            if (isZipFile(typedArray)) {
+                                const zip = await JSZip.loadAsync(typedArray);
+                                const newZip = new JSZip();
+                                let processedFiles = 0;
+                                const totalFiles = Object.keys(zip.files).length;
+
+                                for (const [filename, fileData] of Object.entries(zip.files)) {
+                                    const content = await fileData.async('arraybuffer');
+                                    newZip.file(filename, content);
+                                    processedFiles++;
+                                    progressIndicator.style.width = `${(processedFiles / totalFiles) * 100}%`;
+                                }
+
+                                const decryptedZip = await newZip.generateAsync({ type: 'blob' });
+                                downloadDecryptedFile(decryptedZip, file.name.replace('.lfs', ''), resultDiv);
+                                showNotification('ZIPファイルの復号化が完了しました。', 'success');
+                            } else {
+                                const blob = new Blob([typedArray], { type: 'application/octet-stream' });
+                                downloadDecryptedFile(blob, file.name.replace('.lfs', ''), resultDiv);
+                                showNotification('ファイルの復号化が完了しました。', 'success');
+                            }
+                        } catch (error) {
+                            showNotification('パスワードが正しくないか、ファイルが破損しています。', 'error');
+                        }
+                    }
+                } catch (error) {
+                    showNotification('復号化中にエラーが発生しました。', 'error');
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        function isZipFile(array) {
+            // ZIPファイルのマジックナンバーをチェック
+            return array[0] === 0x50 && array[1] === 0x4B && array[2] === 0x03 && array[3] === 0x04;
+        }
+
+        function convertWordArrayToUint8Array(wordArray) {
+            const len = wordArray.sigBytes;
+            const words = wordArray.words;
+            const uint8Array = new Uint8Array(len);
+            let i = 0;
+            let offset = 0;
+
+            while (i < len) {
+                const word = words[offset++];
+                uint8Array[i++] = (word >> 24) & 0xff;
+                if (i < len) uint8Array[i++] = (word >> 16) & 0xff;
+                if (i < len) uint8Array[i++] = (word >> 8) & 0xff;
+                if (i < len) uint8Array[i++] = word & 0xff;
+            }
+
+            return uint8Array;
+        }
+
+        function showResult(element, message, type = 'success') {
+            element.textContent = message;
+            element.className = `mt-4 text-sm ${type === 'error' ? 'text-red-600' : 'text-green-600'}`;
+        }
+
+        function downloadEncryptedFile(blob, filename, resultDiv) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showResult(resultDiv, '暗号化が完了しました。');
+        }
+
+        function downloadDecryptedFile(blob, filename, resultDiv) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showResult(resultDiv, '復号化が完了しました。');
+        }
+    </script>
+</body>
+</html>
